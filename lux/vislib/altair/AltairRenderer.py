@@ -48,6 +48,15 @@ class AltairRenderer:
         chart : altair.Chart
                 Output Altair Chart Object
         """
+
+        def check_stacked_barchart(vis):
+            if len(vis.get_attr_by_channel("color")) != 1:
+                return False
+            x_attr = vis.get_attr_by_channel("x")[0]
+            y_attr = vis.get_attr_by_channel("y")[0]
+            color_attr = vis.get_attr_by_channel("color")[0]
+            return x_attr.data_type == 'quantitative' and y_attr.data_type == 'nominal' and color_attr.data_type == 'nominal' and x_attr.aggregation != 'sum'
+
         # Lazy Evaluation for 2D Binning
         if vis.mark == "scatter" and vis._postbin:
             vis._mark = "heatmap"
@@ -75,7 +84,10 @@ class AltairRenderer:
         if vis.mark == "histogram":
             chart = Histogram(vis)
         elif vis.mark == "bar":
-            chart = BarChart(vis)
+            if check_stacked_barchart(vis):
+                chart = Heatmap(vis)
+            else:
+                chart = BarChart(vis)
         elif vis.mark == "scatter":
             chart = ScatterChart(vis)
         elif vis.mark == "line":
