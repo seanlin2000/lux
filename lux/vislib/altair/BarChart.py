@@ -35,6 +35,14 @@ class BarChart(AltairChart):
     def __repr__(self):
         return f"Bar Chart <{str(self.vis)}>"
 
+    def check_grouped_barchart(self, vis):
+        if len(vis.get_attr_by_channel("color")) != 1:
+            return False
+        x_attr = vis.get_attr_by_channel("x")[0]
+        y_attr = vis.get_attr_by_channel("y")[0]
+        color_attr = vis.get_attr_by_channel("color")[0]
+        return x_attr.data_type == 'quantitative' and y_attr.data_type == 'nominal' and color_attr.data_type == 'nominal' and x_attr.aggregation != 'sum'
+
     def initialize_chart(self):
         self.tooltip = False
         x_attr = self.vis.get_attr_by_channel("x")[0]
@@ -118,20 +126,52 @@ class BarChart(AltairChart):
 		)
 		chart = chart + text\n"""
         self.data = AltairChart.sanitize_dataframe(self.data)
-        chart = alt.Chart(self.data).mark_bar().encode(y=y_attr_field, x=x_attr_field)
+        if self.check_grouped_barchart(self.vis):
+            print("Well hello there")
+            
+            row_attr = self.vis.get_attr_by_channel("color")[0]
+            row_attr_field = alt.Column(
+                str(row_attr.attribute),
+                type=row_attr.data_type,
+            )
+            row_attr_field_code = f"alt.Column('{row_attr.attribute}', type= '{row_attr.data_type}')"
 
-        # TODO: tooltip messes up the count() bar charts
-        # Can not do interactive whenever you have default count measure otherwise output strange error (Javascript Error: Cannot read property 'length' of undefined)
-        # chart = chart.interactive() # If you want to enable Zooming and Panning
+            color_attr_field = alt.Color(y_attr_field.shorthand, type=y_attr_field.type)
+            print(y_attr_field)
+            color_attr_field_code = f"alt.Color('{y_attr_field.shorthand}', type= '{y_attr_field.type}')"
 
-        self.code += "import altair as alt\n"
-        # self.code += f"visData = pd.DataFrame({str(self.data.to_dict(orient='records'))})\n"
-        self.code += f"visData = pd.DataFrame({str(self.data.to_dict())})\n"
-        self.code += f"""
-		chart = alt.Chart(visData).mark_bar().encode(
-		    y = {y_attr_field_code},
-		    x = {x_attr_field_code},
-		)\n"""
+            chart = alt.Chart(self.data).mark_bar().encode(y=y_attr_field, x=x_attr_field, row=row_attr_field, color=color_attr_field)
+
+            # TODO: tooltip messes up the count() bar charts
+            # Can not do interactive whenever you have default count measure otherwise output strange error (Javascript Error: Cannot read property 'length' of undefined)
+            # chart = chart.interactive() # If you want to enable Zooming and Panning
+
+            self.code += "import altair as alt\n"
+            # self.code += f"visData = pd.DataFrame({str(self.data.to_dict(orient='records'))})\n"
+            self.code += f"visData = pd.DataFrame({str(self.data.to_dict())})\n"
+            self.code += f"""
+            chart = alt.Chart(visData).mark_bar().encode(
+                y = {y_attr_field_code},
+                x = {x_attr_field_code},
+                column = {row_attr_field_code},
+                color = {color_attr_field_code},
+            )\n"""
+
+        else:
+            chart = alt.Chart(self.data).mark_bar().encode(y=y_attr_field, x=x_attr_field)
+
+            # TODO: tooltip messes up the count() bar charts
+            # Can not do interactive whenever you have default count measure otherwise output strange error (Javascript Error: Cannot read property 'length' of undefined)
+            # chart = chart.interactive() # If you want to enable Zooming and Panning
+
+            self.code += "import altair as alt\n"
+            # self.code += f"visData = pd.DataFrame({str(self.data.to_dict(orient='records'))})\n"
+            self.code += f"visData = pd.DataFrame({str(self.data.to_dict())})\n"
+            self.code += f"""
+            chart = alt.Chart(visData).mark_bar().encode(
+                y = {y_attr_field_code},
+                x = {x_attr_field_code},
+            )\n"""
         return chart
 
     def add_text(self):
