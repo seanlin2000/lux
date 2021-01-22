@@ -39,10 +39,33 @@ class BarChart(MatplotlibChart):
     def __repr__(self):
         return f"Bar Chart <{str(self.vis)}>"
 
+    def check_grouped_barchart(self, vis):
+        if len(vis.get_attr_by_channel("color")) != 1:
+            return False
+        x_attr = vis.get_attr_by_channel("x")[0]
+        y_attr = vis.get_attr_by_channel("y")[0]
+        color_attr = vis.get_attr_by_channel("color")[0]
+        return (
+            x_attr.data_type == "quantitative"
+            and y_attr.data_type == "nominal"
+            and color_attr.data_type == "nominal"
+            and x_attr.aggregation != "sum"
+        )
+
     def initialize_chart(self):
         self.tooltip = False
         x_attr = self.vis.get_attr_by_channel("x")[0]
-        y_attr = self.vis.get_attr_by_channel("y")[0]
+        if self.check_grouped_barchart(self.vis):
+            """
+            In a grouped bar chart, the bar_attribute stays on the x-axis. However, now the color_attribute
+            is on the y-axis of the bar, and the measure_attribute becomes the "color" of each bar (measure_attribute appears on legend).
+            Thus, we switch the two attributes
+            """
+            y_attr = self.vis.get_attr_by_channel("color")[0]
+            color_attr = self.vis.get_attr_by_channel("y")
+        else:
+            y_attr = self.vis.get_attr_by_channel("y")[0]
+            color_attr = self.vis.get_attr_by_channel("color")
 
         x_attr_abv = x_attr.attribute
         y_attr_abv = y_attr.attribute
@@ -96,15 +119,15 @@ class BarChart(MatplotlibChart):
 
         plot_code = ""
 
-        color_attr = self.vis.get_attr_by_channel("color")
         if len(color_attr) == 1:
-            self.fig, self.ax = matplotlib_setup(6, 4)
             color_attr_name = color_attr[0].attribute
             color_attr_type = color_attr[0].data_type
             colors = df[color_attr_name].values
             unique = list(set(colors))
             d_x = {}
             d_y = {}
+            self.fig, self.ax = matplotlib_setup(6, 4)
+            width = np.min(np.diff(unique)) / len(unique)  # the width of the bars
             for i in unique:
                 d_x[i] = []
                 d_y[i] = []
@@ -112,10 +135,21 @@ class BarChart(MatplotlibChart):
                 d_x[colors[i]].append(bars[i])
                 d_y[colors[i]].append(measurements[i])
             for i in range(len(unique)):
-                self.ax.barh(d_x[unique[i]], d_y[unique[i]], label=unique[i])
-                plot_code += (
-                    f"ax.barh({d_x}[{unique}[{i}]], {d_y}[{unique}[{i}]], label={unique}[{i}])\n"
-                )
+                if self.check_grouped_barchart(self.vis):
+                    """
+                    In a grouped barchart, we need to specify widths to shift the bars
+                    """
+                    x = [i for i in range(len(d_x[unique[i]]))]
+                    self.ax.barh(x - i * width, d_y[unique[i]], width, label=unique[i])
+                    plot_code += (
+                        f"ax.barh({x - i * width}, {d_y}[{unique}[{i}]], {width}, label={unique}[{i}])\n"
+                    )
+
+                else:
+                    self.ax.barh(d_x[unique[i]], d_y[unique[i]], label=unique[i])
+                    plot_code += (
+                        f"ax.barh({d_x}[{unique}[{i}]], {d_y}[{unique}[{i}]], label={unique}[{i}])\n"
+                    )
             self.ax.legend(
                 title=color_attr_name, bbox_to_anchor=(1.05, 1), loc="upper left", ncol=1, frameon=False
             )
@@ -125,6 +159,19 @@ class BarChart(MatplotlibChart):
                 loc='upper left', 
                 ncol=1, 
                 frameon=False,)\n"""
+
+            if self.check_grouped_barchart(self.vis):
+                y_ticks_abbev = df[bar_attr].apply(
+                    lambda x: str(x)[:10] + "..." if len(str(x)) > 10 else str(x)
+                )
+                # self.ax.set_yticks(bars)
+                # self.ax.set_yticklabels(y_ticks_abbev)
+
+                # self.ax.set_xlabel(x_attr_abv)
+                self.ax.set_ylabel(y_attr_abv)
+                plt.gca().invert_yaxis()
+                return
+
         else:
             self.ax.barh(bars, measurements, align="center")
             plot_code += f"ax.barh(bars, measurements, align='center')\n"

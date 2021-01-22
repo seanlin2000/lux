@@ -41,7 +41,12 @@ class BarChart(AltairChart):
         x_attr = vis.get_attr_by_channel("x")[0]
         y_attr = vis.get_attr_by_channel("y")[0]
         color_attr = vis.get_attr_by_channel("color")[0]
-        return x_attr.data_type == 'quantitative' and y_attr.data_type == 'nominal' and color_attr.data_type == 'nominal' and x_attr.aggregation != 'sum'
+        return (
+            x_attr.data_type == "quantitative"
+            and y_attr.data_type == "nominal"
+            and color_attr.data_type == "nominal"
+            and x_attr.aggregation != "sum"
+        )
 
     def initialize_chart(self):
         self.tooltip = False
@@ -127,8 +132,6 @@ class BarChart(AltairChart):
 		chart = chart + text\n"""
         self.data = AltairChart.sanitize_dataframe(self.data)
         if self.check_grouped_barchart(self.vis):
-            print("Well hello there")
-            
             row_attr = self.vis.get_attr_by_channel("color")[0]
             row_attr_field = alt.Column(
                 str(row_attr.attribute),
@@ -137,10 +140,13 @@ class BarChart(AltairChart):
             row_attr_field_code = f"alt.Column('{row_attr.attribute}', type= '{row_attr.data_type}')"
 
             color_attr_field = alt.Color(y_attr_field.shorthand, type=y_attr_field.type)
-            print(y_attr_field)
             color_attr_field_code = f"alt.Color('{y_attr_field.shorthand}', type= '{y_attr_field.type}')"
 
-            chart = alt.Chart(self.data).mark_bar().encode(y=y_attr_field, x=x_attr_field, row=row_attr_field, color=color_attr_field)
+            chart = (
+                alt.Chart(self.data)
+                .mark_bar()
+                .encode(y=y_attr_field, x=x_attr_field, row=row_attr_field, color=color_attr_field)
+            )
 
             # TODO: tooltip messes up the count() bar charts
             # Can not do interactive whenever you have default count measure otherwise output strange error (Javascript Error: Cannot read property 'length' of undefined)
